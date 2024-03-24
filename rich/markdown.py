@@ -175,18 +175,19 @@ class CodeBlock(TextElement):
     def create(cls, markdown: "Markdown", token: Token) -> "CodeBlock":
         node_info = token.info or ""
         lexer_name = node_info.partition(" ")[0]
-        return cls(lexer_name or "text", markdown.code_theme)
+        return cls(lexer_name or "text", markdown.code_theme, markdown.code_padding)
 
-    def __init__(self, lexer_name: str, theme: str) -> None:
+    def __init__(self, lexer_name: str, theme: str, padding: int) -> None:
         self.lexer_name = lexer_name
         self.theme = theme
+        self.padding = padding
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
         code = str(self.text).rstrip()
         syntax = Syntax(
-            code, self.lexer_name, theme=self.theme, word_wrap=True, padding=1
+            code, self.lexer_name, theme=self.theme, word_wrap=True, padding=self.padding
         )
         yield syntax
 
@@ -561,6 +562,7 @@ class Markdown(JupyterMixin):
         hyperlinks: bool = True,
         inline_code_lexer: Optional[str] = None,
         inline_code_theme: Optional[str] = None,
+        code_padding: int = 1
     ) -> None:
         parser = MarkdownIt().enable("strikethrough").enable("table")
         self.markup = markup
@@ -571,6 +573,7 @@ class Markdown(JupyterMixin):
         self.hyperlinks = hyperlinks
         self.inline_code_lexer = inline_code_lexer
         self.inline_code_theme = inline_code_theme or code_theme
+        self.code_padding = code_padding
 
     def _flatten_tokens(self, tokens: Iterable[Token]) -> Iterable[Token]:
         """Flattens the token stream."""
@@ -662,6 +665,7 @@ class Markdown(JupyterMixin):
             else:
                 # Map the markdown tag -> MarkdownElement renderable
                 element_class = self.elements.get(token.type) or UnknownElement
+
                 element = element_class.create(self, token)
 
                 if entering or self_closing:
@@ -765,6 +769,13 @@ if __name__ == "__main__":  # pragma: no cover
         action="store_true",
         help="use pager to scroll output",
     )
+    parser.add_argument(
+        "-d", "--code-padding",
+        type=int,
+        dest="code_padding",
+        default=1,
+        help="number of leading spaces for code block padding"
+    )
     args = parser.parse_args()
 
     from rich.console import Console
@@ -781,6 +792,7 @@ if __name__ == "__main__":  # pragma: no cover
         code_theme=args.code_theme,
         hyperlinks=args.hyperlinks,
         inline_code_lexer=args.inline_code_lexer,
+        code_padding=args.code_padding
     )
     if args.page:
         import io
